@@ -111,51 +111,56 @@ async def get_current_user(session: Optional[str] = Cookie(None)) -> Optional[di
 
 async def login_user(response: Response, user_data: UserLogin):
     """Logique de connexion d'un utilisateur"""
-    user = authenticate_user(user_data.email, user_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email ou mot de passe incorrect"
+    try:
+        user = authenticate_user(user_data.email, user_data.password)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Email ou mot de passe incorrect"
+            )
+
+        logger.info(f"Login attempt for user: {user_data.email}")
+        
+        if not user["is_active"]:
+            logger.warning(f"Inactive user attempted login: {user_data.email}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Compte désactivé"
+            )
+
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user["email"]},
+            expires_delta=access_token_expires
         )
 
-    print(f"user['is_active']: {user['is_active']}")
-    if not user["is_active"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Compte désactivé"
+        # Configuration du cookie de session
+        is_production = os.getenv("ENVIRONMENT", "development") == "production"
+        
+        response.set_cookie(
+            key="session",
+            value=access_token,
+            httponly=True,
+            secure=is_production,  # True in production (HTTPS)
+            samesite="lax" if is_production else "strict",  # Use lax in production for cross-site requests
+            max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            path="/",
         )
 
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user["email"]},
-        expires_delta=access_token_expires
-    )
-
-    # Configuration du cookie de session
-    cookie_domain = os.getenv("COOKIE_DOMAIN", None)  # Will be set automatically if None
-    is_production = os.getenv("ENVIRONMENT", "development") == "production"
-    
-    response.set_cookie(
-        key="session",
-        value=access_token,
-        httponly=True,
-        secure=is_production,  # True in production (HTTPS)
-        samesite="strict",
-        domain=cookie_domain,
-        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        path="/",
-    )
-
-    return {
-        "authenticated": True,
-        "user": {
-            "id": user["id"],
-            "email": user["email"],
-            "username": user["username"],
-            "is_active": user["is_active"],
-            "is_admin": user["is_admin"]
+        logger.info(f"Successfully logged in user: {user_data.email}")
+        return {
+            "authenticated": True,
+            "user": {
+                "id": user["id"],
+                "email": user["email"],
+                "username": user["username"],
+                "is_active": user["is_active"],
+                "is_admin": user["is_admin"]
+            }
         }
-    }
+    except Exception as e:
+        logger.error(f"Login error for user {user_data.email}: {str(e)}")
+        raise
 
 async def register_user(user_data: UserRegistration):
     """Logique d'enregistrement d'un nouvel utilisateur"""
