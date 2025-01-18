@@ -58,7 +58,9 @@ app.add_middleware(
     allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=settings.allowed_methods,
-    allow_headers=settings.allowed_headers,
+    allow_headers=["*"],  # Ou au minimum: ["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"]
+    expose_headers=["*"],
+    max_age=3600,
 )
 
 # Add CORS headers to all responses
@@ -121,14 +123,16 @@ async def extend_session_middleware(request: Request, call_next):
                     expires_delta=access_token_expires
                 )
                 
-                # Mettre à jour le cookie de session
+                is_production = settings.environment == "production"
+                secure_cookie = is_production  # True en production
+
                 response.set_cookie(
                     key="session",
                     value=access_token,
                     httponly=True,
-                    max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+                    secure=secure_cookie,  # True en production
                     samesite="lax",
-                    secure=False  # Mettre à True en production avec HTTPS
+                    max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
                 )
         except HTTPException:
             # Si le token est invalide, on ne fait rien
