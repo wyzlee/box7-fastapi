@@ -53,15 +53,26 @@ load_dotenv()
 ] """
 origins = settings.allowed_origins
 
+# Configuration CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=settings.allowed_methods,
-    allow_headers=["*"],  # Ou au minimum: ["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"]
-    expose_headers=["*"],
+    allow_headers=["*"],
+    expose_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
     max_age=3600,
 )
+
+@app.middleware("http")
+async def log_session_middleware(request: Request, call_next):
+    logger.info(f"Request path: {request.url.path}")
+    logger.info(f"Request cookies: {request.cookies}")
+    logger.info(f"Request headers: {request.headers}")
+    response = await call_next(request)
+    logger.info(f"Response status: {response.status_code}")
+    logger.info(f"Response headers: {response.headers}")
+    return response
 
 # Add CORS headers to all responses
 @app.middleware("http")
@@ -107,14 +118,11 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.middleware("http")
 async def extend_session_middleware(request: Request, call_next):
+    session = request.cookies.get("session")
     response = await call_next(request)
     
-    # Récupérer le cookie de session
-    session = request.cookies.get("session")
     if session:
-        # Créer un nouveau token avec une durée prolongée
         try:
-            # Vérifier si l'utilisateur est valide
             user = await get_current_user(session)
             if user:
                 access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -124,19 +132,23 @@ async def extend_session_middleware(request: Request, call_next):
                 )
                 
                 is_production = settings.environment == "production"
-                secure_cookie = is_production  # True en production
-
+                domain = None  # Let the browser set the domain
+                
                 response.set_cookie(
                     key="session",
                     value=access_token,
                     httponly=True,
-                    secure=secure_cookie,  # True en production
+                    secure=is_production,
                     samesite="lax",
-                    max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
+                    max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+                    path="/",  # Important: cookie disponible pour tout le domaine
+                    domain=domain
                 )
-        except HTTPException:
-            # Si le token est invalide, on ne fait rien
-            pass
+                logger.info(f"Session extended for user: {user['email']}")
+            else:
+                logger.warning("User not found for session")
+        except Exception as e:
+            logger.error(f"Error extending session: {str(e)}")
     
     return response
 
