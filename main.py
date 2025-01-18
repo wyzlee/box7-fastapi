@@ -80,10 +80,12 @@ async def add_cors_headers(request: Request, call_next):
     response = await call_next(request)
     origin = request.headers.get("origin")
     
-    if origin in origins:
+    if origin in settings.allowed_origins:
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
-    
+        response.headers["Access-Control-Expose-Headers"] = "Set-Cookie"
+        
+    logger.info(f"CORS headers set for origin: {origin}")
     return response
 
 # Initialisation de la base de données
