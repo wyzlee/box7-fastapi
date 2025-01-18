@@ -1,11 +1,11 @@
-fastapi
+fastapi>=0.109.0
 fastapi-sessions
 uvicorn>=0.27.0
-python-multipart
-pydantic
-pydantic-extra-types
-pydantic[email]
-python-jose[cryptography]
+python-multipart>=0.0.6
+pydantic>=2.5.3
+pydantic-extra-types>=2.3.0
+pydantic[email]>=2.5.3
+python-jose[cryptography]>=3.3.0
 passlib==1.7.4
 bcrypt==4.0.1
 websockets>=11.0,<12.0
@@ -15,5 +15,5 @@ networkx
 chromadb
 pypdf>=3.17.1
 python-docx
-aiofiles
+aiofiles>=23.2.1
 python-dotenv>=1.0.0
