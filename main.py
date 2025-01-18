@@ -132,21 +132,21 @@ async def extend_session_middleware(request: Request, call_next):
                     data={"sub": user["email"]},
                     expires_delta=access_token_expires
                 )
-                
-                is_production = settings.environment == "production"
-                domain = None  # Let the browser set the domain
+
+                # Utiliser la méthode get_cookie_domain pour déterminer le domaine
+                cookie_domain = settings.get_cookie_domain()
                 
                 response.set_cookie(
                     key="session",
                     value=access_token,
                     httponly=True,
-                    secure=is_production,
+                    secure=settings.environment == "production",
                     samesite="lax",
                     max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-                    path="/",  # Important: cookie disponible pour tout le domaine
-                    domain=domain
+                    path="/",
+                    domain=cookie_domain  # Sera None en développement
                 )
-                logger.info(f"Session extended for user: {user['email']}")
+                logger.info(f"Session extended for user: {user['email']} with domain: {cookie_domain}")
             else:
                 logger.warning("User not found for session")
         except Exception as e:
