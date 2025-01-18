@@ -20,6 +20,8 @@ import aiofiles
 from datetime import timedelta
 from app.utils.crewai_functions import choose_llm, llm_configs
 
+from config import settings
+
 MAGENTA = "\033[95m"
 RED = "\033[91m"
 GREEN = "\033[92m"
@@ -38,37 +40,18 @@ app = FastAPI(
 load_dotenv()
 
 # Configuration CORS avec support des cookies
-origins = [
+""" origins = [
     os.getenv("FRONTEND_URL", "http://localhost:3000"),  # Frontend React (URL principale)
     os.getenv("FRONTEND_URL_ALTERNATIVE", "http://127.0.0.1:3000"),  # URL alternative
     "https://box7-react-68938d4bd5ee.herokuapp.com",  # Production React frontend
-]
+] """
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=[
-        "Content-Type", 
-        "Authorization", 
-        "Accept", 
-        "Origin", 
-        "X-Requested-With",
-        "Access-Control-Request-Method",
-        "Access-Control-Request-Headers",
-        "Access-Control-Allow-Origin",
-        "Access-Control-Allow-Credentials",
-        "Access-Control-Allow-Headers",
-        "Access-Control-Allow-Methods",
-    ],
-    expose_headers=[
-        "Content-Type", 
-        "Set-Cookie",
-        "Access-Control-Allow-Origin",
-        "Access-Control-Allow-Credentials",
-    ],
-    max_age=3600,
+    allow_methods=settings.allowed_methods,
+    allow_headers=settings.allowed_headers,
 )
 
 # Add CORS headers to all responses
