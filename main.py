@@ -54,13 +54,14 @@ load_dotenv()
 origins = settings.allowed_origins
 
 # Configuration CORS
+# Configuration CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
     allow_credentials=True,
-    allow_methods=settings.allowed_methods,
-    allow_headers=["*"],
-    expose_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
+    allow_methods=["*"],  # Plus permissif pour le développement
+    allow_headers=["*"],  # Plus permissif pour le développement
+    expose_headers=["Set-Cookie", "Content-Type"],
     max_age=3600,
 )
 
@@ -132,26 +133,33 @@ async def extend_session_middleware(request: Request, call_next):
                     data={"sub": user["email"]},
                     expires_delta=access_token_expires
                 )
-
-                # Utiliser la méthode get_cookie_domain pour déterminer le domaine
-                cookie_domain = settings.get_cookie_domain()
                 
+                # Configuration stricte des cookies pour la sécurité
                 response.set_cookie(
                     key="session",
                     value=access_token,
+                    domain=None,  # Laissez le navigateur gérer le domaine
                     httponly=True,
                     secure=settings.environment == "production",
                     samesite="lax",
                     max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-                    path="/",
-                    domain=cookie_domain  # Sera None en développement
+                    path="/"
                 )
-                logger.info(f"Session extended for user: {user['email']} with domain: {cookie_domain}")
+                
+                # Log pour déboguer
+                logger.info(f"Set cookie for {user['email']} with headers: {response.headers}")
             else:
                 logger.warning("User not found for session")
         except Exception as e:
             logger.error(f"Error extending session: {str(e)}")
     
+    return response
+
+@app.middleware("http")
+async def trace_cookies(request: Request, call_next):
+    logger.info(f"Incoming request cookies: {request.cookies}")
+    response = await call_next(request)
+    logger.info(f"Outgoing response headers: {response.headers}")
     return response
 
 # Inclusion des routes
