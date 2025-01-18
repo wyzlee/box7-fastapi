@@ -40,15 +40,19 @@ load_dotenv()
 # Configuration CORS avec support des cookies
 origins = [
     os.getenv("FRONTEND_URL", "http://localhost:3000"),  # Frontend React (URL principale)
-    os.getenv("FRONTEND_URL_ALTERNATIVE", "http://127.0.0.1:3000")  # URL alternative
+    os.getenv("FRONTEND_URL_ALTERNATIVE", "http://127.0.0.1:3000"),  # URL alternative
+    "https://*.herokuapp.com",  # Allow all Heroku subdomains
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Set-Cookie", "Access-Control-Allow-Headers", 
+                  "Access-Control-Allow-Origin", "Authorization"],
+    expose_headers=["Content-Type", "Set-Cookie"],
+    max_age=3600,
 )
 
 # Initialisation de la base de données

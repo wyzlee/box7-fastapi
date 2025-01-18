@@ -5,14 +5,15 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from uuid import uuid4
 from passlib.context import CryptContext
+from os import getenv
 
 from app.models.user import User, UserLogin, UserRegistration
 from app.database.database import get_user_by_email, create_user, check_user_exists
 
 # Configuration de la sécurité
-SECRET_KEY = "votre_clé_secrète_ici"  # À changer en production
+SECRET_KEY = getenv("SECRET_KEY", "votre_clé_secrète_ici")  # Must be set in production
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = int(getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
 # Configuration du hachage de mot de passe
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -131,8 +132,10 @@ async def login_user(response: Response, user_data: UserLogin):
         value=access_token,
         httponly=True,
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        samesite="lax",
-        secure=False  # Mettre à True en production avec HTTPS
+        samesite="strict",
+        secure=True,
+        domain=None,
+        path="/"
     )
 
     return {
