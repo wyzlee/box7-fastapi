@@ -8,6 +8,7 @@ from app.auth.auth import (
     get_current_user_info
 )
 from app.models.user import UserLogin, UserRegistration
+import logging
 
 # Configuration du router
 router = APIRouter()
@@ -15,7 +16,19 @@ router = APIRouter()
 @router.post("/login")
 async def login(response: Response, user_data: UserLogin):
     """Endpoint de login qui retourne un token JWT et crée une session"""
-    return await login_user(response, user_data)
+    try:
+        # login_user gère déjà la création du token et du cookie
+        result = await login_user(response, user_data)
+        return result
+    except HTTPException as e:
+        # Propager les exceptions HTTP
+        raise e
+    except Exception as e:
+        logger.error(f"Unexpected error in login route: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Une erreur est survenue lors de la connexion"
+        )
 
 @router.post("/register")
 async def register(user_data: UserRegistration):

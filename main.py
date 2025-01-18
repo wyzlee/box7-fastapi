@@ -54,14 +54,20 @@ load_dotenv()
 origins = settings.allowed_origins
 
 # Configuration CORS
-# Configuration CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],  # Plus permissif pour le développement
-    allow_headers=["*"],  # Plus permissif pour le développement
-    expose_headers=["Set-Cookie", "Content-Type"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=[
+        "Accept", 
+        "Authorization", 
+        "Content-Type", 
+        "X-Requested-With",
+        "X-CSRF-Token",
+        "Origin"
+    ],
+    expose_headers=["Set-Cookie"],
     max_age=3600,
 )
 

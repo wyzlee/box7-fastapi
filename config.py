@@ -3,9 +3,19 @@ from typing import List, Optional
 
 class Settings(BaseSettings):
     # Existing settings
-    allowed_origins: List[str] = ["http://localhost:3000"]
+    allowed_origins: List[str] = [
+        "http://localhost:3000",
+        "https://box7-react.onrender.com"
+    ]
     allowed_methods: List[str] = ["GET", "POST", "PUT", "DELETE"]
-    allowed_headers: List[str] = ["Authorization", "Content-Type"]
+    allowed_headers: List[str] = [
+        "Accept", 
+        "Authorization", 
+        "Content-Type", 
+        "X-Requested-With",
+        "X-CSRF-Token",
+        "Origin"
+    ]
 
     # Add these new settings
     api_domain: Optional[str] = "localhost"  # Pour le développement local
