@@ -21,6 +21,12 @@ from datetime import timedelta
 from app.utils.crewai_functions import choose_llm, llm_configs
 
 from config import settings
+import asyncio
+
+# Configuration des logs
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 MAGENTA = "\033[95m"
 RED = "\033[91m"
@@ -45,6 +51,7 @@ load_dotenv()
     os.getenv("FRONTEND_URL_ALTERNATIVE", "http://127.0.0.1:3000"),  # URL alternative
     "https://box7-react-68938d4bd5ee.herokuapp.com",  # Production React frontend
 ] """
+origins = settings.allowed_origins
 
 app.add_middleware(
     CORSMiddleware,
@@ -72,23 +79,29 @@ init_db()
 # WebSocket connection manager
 @app.websocket("/ws/diagram")
 async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
+    await manager.connect(websocket)  # Accepte la connexion
     try:
         while True:
             try:
-                # Keep the connection alive with ping/pong
+                # Reçoit des messages du client
                 data = await websocket.receive_text()
-                await websocket.send_text('pong')
+                logger.info(f"Message reçu : {data}")
+
+                # Envoie une réponse au client
+                await websocket.send_text("pong")
+
+                # Exemple de diffusion d'un message à tous les clients
+                await manager.broadcast({"type": "notification", "content": f"New message: {data}"})
             except WebSocketDisconnect:
-                manager.disconnect(websocket)
+                logger.info("Client disconnected")
                 break
             except Exception as e:
-                print(f"WebSocket error: {str(e)}")
+                logger.error(f"WebSocket error: {str(e)}")
                 break
     except Exception as e:
-        print(f"WebSocket connection error: {str(e)}")
+        logger.error(f"WebSocket connection error: {str(e)}")
     finally:
-        manager.disconnect(websocket)
+        manager.disconnect(websocket)  # Nettoie la connexio
 
 @app.middleware("http")
 async def extend_session_middleware(request: Request, call_next):
@@ -539,4 +552,14 @@ async def root():
 # Point d'entrée pour lancer l'application
 if __name__ == "__main__":
     import uvicorn
+
+    # Démarre la tâche de nettoyage des connexions inactives
+    async def start_cleanup_task():
+        await manager.start_cleanup_task()
+
+    # Démarre la boucle d'événements et la tâche de nettoyage
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(start_cleanup_task())
+
+    # Démarre l'application FastAPI
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
