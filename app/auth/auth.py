@@ -6,6 +6,7 @@ from jose import JWTError, jwt
 from uuid import uuid4
 from passlib.context import CryptContext
 from os import getenv
+import logging
 
 from app.models.user import User, UserLogin, UserRegistration
 from app.database.database import get_user_by_email, create_user, check_user_exists
@@ -20,6 +21,10 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Set pour stocker les tokens invalidés
 invalidated_tokens: Set[str] = set()
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Vérifie si le mot de passe correspond au hash"""
@@ -127,15 +132,18 @@ async def login_user(response: Response, user_data: UserLogin):
     )
 
     # Configuration du cookie de session
+    cookie_domain = os.getenv("COOKIE_DOMAIN", None)  # Will be set automatically if None
+    is_production = os.getenv("ENVIRONMENT", "development") == "production"
+    
     response.set_cookie(
         key="session",
         value=access_token,
         httponly=True,
-        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        secure=is_production,  # True in production (HTTPS)
         samesite="strict",
-        secure=True,
-        domain=None,
-        path="/"
+        domain=cookie_domain,
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
     )
 
     return {
@@ -193,27 +201,52 @@ async def register_user(user_data: UserRegistration):
 async def logout_user(response: Response, session: Optional[str] = Cookie(None)):
     """Logique de déconnexion d'un utilisateur"""
     if session:
+        # Invalider le token
         invalidate_token(session)
-    
-    response.delete_cookie(
-        key="session",
-        httponly=True,
-        samesite="lax",
-        secure=False  # Mettre à True en production avec HTTPS
-    )
+        
+        # Supprimer le cookie avec les mêmes paramètres que lors de sa création
+        cookie_domain = os.getenv("COOKIE_DOMAIN", None)
+        is_production = os.getenv("ENVIRONMENT", "development") == "production"
+        
+        response.delete_cookie(
+            key="session",
+            path="/",
+            domain=cookie_domain,
+            secure=is_production,
+            httponly=True,
+            samesite="strict"
+        )
     
     return {"message": "Déconnecté avec succès"}
 
 async def check_auth_status(session: Optional[str] = Cookie(None)):
-    """Vérifie le statut d'authentification d'un utilisateur"""
-    if not session:
-        return {"authenticated": False}
-
+    """Vérifie si l'utilisateur est authentifié via le cookie de session"""
     try:
-        user = await get_current_user(session)
-        if not user:
+        if not session:
+            logger.info("No session cookie found")
             return {"authenticated": False}
 
+        if not is_token_valid(session):
+            logger.warning("Invalid session token found")
+            return {"authenticated": False}
+
+        payload = jwt.decode(session, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        
+        if email is None:
+            logger.warning("No email found in session token")
+            return {"authenticated": False}
+
+        user = get_user(email)
+        if user is None:
+            logger.warning(f"No user found for email: {email}")
+            return {"authenticated": False}
+
+        if not user["is_active"]:
+            logger.warning(f"Inactive user attempted authentication: {email}")
+            return {"authenticated": False}
+
+        logger.info(f"Successfully authenticated user: {email}")
         return {
             "authenticated": True,
             "user": {
@@ -224,7 +257,11 @@ async def check_auth_status(session: Optional[str] = Cookie(None)):
                 "is_admin": user["is_admin"]
             }
         }
-    except HTTPException:
+    except JWTError as e:
+        logger.error(f"JWT Error during auth check: {str(e)}")
+        return {"authenticated": False}
+    except Exception as e:
+        logger.error(f"Unexpected error during auth check: {str(e)}")
         return {"authenticated": False}
 
 async def get_current_user_info(session: Optional[str] = Cookie(None)):
